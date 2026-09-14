@@ -1,0 +1,42 @@
+name: One-time SharpSites factual repair
+on:
+  push:
+    branches: [gh-pages]
+    paths: ['.github/workflows/sharpsites-one-time-repair.yml']
+permissions:
+  contents: write
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: gh-pages
+      - name: Correct only unsupported claims, address, hours and map placeholder
+        shell: python
+        run: |
+          from pathlib import Path
+          import re
+          p = Path('index.html')
+          s = p.read_text()
+          assert 'KD Grand Banquet' in s and '+919999567482' in s
+          s = s.replace('"streetAddress": "Sewak Park"', '"streetAddress": "24, 25, 26, Block A, Sewak Park"')
+          s = s.replace('Open daily · Timings to be confirmed — please call before visiting.', 'Monday–Sunday · 9:30 AM–9:00 PM (Google listing). Please call before visiting; event schedules may differ.')
+          s = s.replace('<li>DFS fire-safety certified (B+G+3)</li>', '<li>Visit by appointment</li>')
+          s = s.replace('<h3>Fire-safety certified</h3>\n          <p>DFS fire safety certificate covering basement, ground and three floors (B+G+3).</p>', '<h3>Plan your visit</h3>\n          <p>See the halls and confirm the layout, facilities and booking conditions directly with the venue.</p>')
+          s = s.replace('<li>GST-registered since 2017</li>', '<li>Packages on enquiry</li>')
+          s = s.replace('<h3>GST-registered since 2017</h3>\n          <p>Established, GST-registered venue — proper invoicing for every booking.</p>', '<h3>Confirm your package</h3>\n          <p>Ask for a quotation, inclusions and invoice details for your date and guest count.</p>')
+          s = s.replace('KD Grand Banquet, Sewak Park, Dwarka, Delhi 110059 — easy to reach from across Dwarka and West Delhi.', 'KD Grand Banquet, 24, 25, 26, Block A, Sewak Park, Dwarka, New Delhi, Delhi 110059, India.')
+          s = re.sub(r'    <div class="map-slot">\s*<iframe[\s\S]*?</iframe>\s*</div>', '', s, count=1)
+          s = s.replace('<footer class="site-footer">', '<footer class="site-footer">\n  <div class="map-slot" style="min-height:260px;display:flex;align-items:center;justify-content:center;padding:24px;text-align:center">[Add Google Maps embed]</div>')
+          assert 'fire-safety certified' not in s and 'Fire-safety certified' not in s
+          assert '[Add Google Maps embed]' in s and '9:30 AM–9:00 PM' in s
+          p.write_text(s)
+          Path('.github/workflows/sharpsites-one-time-repair.yml').unlink()
+      - name: Publish repaired source, without any outreach action
+        run: |
+          git config user.name 'SharpSites factual repair'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add index.html .github/workflows/sharpsites-one-time-repair.yml
+          git commit -m 'Correct Google hours/address, remove unverified current certification claims, preserve KD Grand design'
+          git push origin HEAD:gh-pages
